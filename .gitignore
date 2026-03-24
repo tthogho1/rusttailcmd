@@ -1,0 +1,12 @@
+# Rust
+target/
+**/target/
+# executables
+*.exe
+
+# IDE/editor
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
