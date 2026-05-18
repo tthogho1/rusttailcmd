@@ -1,0 +1,111 @@
+name: Draft Release from Main
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build macOS release
+        run: cargo build --release
+      - name: Zip macOS binary
+        run: |
+          mkdir -p dist
+          cp target/release/wtail dist/wtail
+          chmod +x dist/wtail
+          cd dist && zip -r ../wtail-macos.zip wtail
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wtail-macos
+          path: wtail-macos.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build Windows release
+        run: cargo build --release
+      - name: Zip Windows binary
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item -Path target\release\wtail.exe -Destination dist\wtail.exe -Force
+          Compress-Archive -Path dist\wtail.exe -DestinationPath wtail-windows.zip -Force
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wtail-windows
+          path: wtail-windows.zip
+
+  package:
+    runs-on: ubuntu-latest
+    needs: [build-macos, build-windows]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wtail-macos
+          path: artifacts/macos
+      - name: Download windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wtail-windows
+          path: artifacts/windows
+      - name: Unpack and combine
+        run: |
+          mkdir -p combined
+          unzip artifacts/macos/wtail-macos.zip -d combined || true
+          unzip artifacts/windows/wtail-windows.zip -d combined || true
+          cd combined
+          zip -r ../wtail.zip .
+      - name: Upload combined artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wtail-combined
+          path: wtail.zip
+
+  create-draft-release:
+    runs-on: ubuntu-latest
+    needs: package
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download combined artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wtail-combined
+          path: ./
+      - name: Create or update draft release
+        id: create_release
+        uses: peter-evans/create-release@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: main-latest
+          target_commitish: ${{ github.sha }}
+          name: "main (latest)"
+          body: |
+            Draft release automatically created from `main` branch.
+          draft: true
+          prerelease: false
+          allow_updates: true
+          create_tag: true
+      - name: Upload wtail.zip to release
+        uses: peter-evans/upload-release-asset@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release_id: ${{ steps.create_release.outputs.id }}
+          asset_path: ./wtail.zip
+          asset_name: wtail.zip
+          asset_content_type: application/zip

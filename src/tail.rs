@@ -53,6 +53,22 @@ pub fn tail_initial(path: &Path, lines: usize) -> Result<Vec<String>> {
     Ok(out[start..].to_vec())
 }
 
+/// Read the last `bytes` bytes of `path`. If the file is shorter than
+/// `bytes`, returns the entire file. Returns raw bytes (no UTF-8 decoding).
+pub fn tail_initial_bytes(path: &Path, bytes: u64) -> Result<Vec<u8>> {
+    let mut f = File::open(path).with_context(|| format!("No such file: {}", path.display()))?;
+    let file_size = f.metadata()?.len();
+    if file_size == 0 || bytes == 0 {
+        return Ok(Vec::new());
+    }
+    let start = file_size.saturating_sub(bytes);
+    f.seek(SeekFrom::Start(start))?;
+    let to_read = (file_size - start) as usize;
+    let mut buf = vec![0u8; to_read];
+    f.read_exact(&mut buf)?;
+    Ok(buf)
+}
+
 pub async fn follow(path: &Path, sleep_seconds: f64, mut on_line: impl FnMut(String) + Send + 'static) -> Result<()> {
     use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
     use std::sync::mpsc::channel;
