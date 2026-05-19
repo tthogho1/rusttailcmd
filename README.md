@@ -66,6 +66,21 @@ wtail -g ERROR --invert-match app.log
 wtail -f -E -g ' 5[0-9]{2} ' access1.log access2.log
 ```
 
+## Quick Start
+
+Fast commands to build, run, and test locally.
+
+```sh
+# Build and run in release mode:
+cargo run --release -- [OPTIONS] [FILES...]
+
+# Run the test suite:
+cargo test
+
+# Install locally with cargo:
+cargo install --path .
+```
+
 ## Build
 
 ```sh
